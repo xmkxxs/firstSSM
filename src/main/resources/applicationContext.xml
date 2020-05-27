@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+<!-- This is Spring Bean -->
+
+<!-- 包扫描 -->
+<context:component-scan base-package="com.xm">
+	<!-- 控制器交给SpringMVC，所以不扫描,将其排除掉 -->
+	<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+</context:component-scan>
+
+<!-- 引入外部文件 -->
+<context:property-placeholder location="classpath:dbconfig.properties"/>
+
+<!-- 配置数据源 -->
+<bean id="pooledDataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+	<property name="jdbcUrl" value="${jdbc.jdbcUrl}"></property>
+	<property name="driverClass" value="${jdbc.driverClass}"></property>
+	<property name="user" value="${jdbc.user}"></property>
+	<property name="password" value="${jdbc.password}"></property>
+</bean>
+
+<!-- MyBatis整合 -->
+<bean id="sqlSessionFactoryBean" class="org.mybatis.spring.SqlSessionFactoryBean">
+	<!-- 指定MyBatis配置文件位置 -->
+	<property name="configLocation" value="classpath:mybatis-config.xml"></property>
+	<!-- 指定 MyBatis使用的数据源-->
+	<property name="dataSource" ref="pooledDataSource"></property>
+	<!-- 指定 MyBatis的mapper文件位置-->
+	<property name="mapperLocations" value="classpath*:mapper/*.xml"></property>
+</bean>
+
+<!-- 扫描mybatis接口的实现添加到容器 -->
+<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+	<property name="basePackage" value="com.xm.crud.dao"></property>
+</bean>
+
+<!-- 配置一个支持批量插入的sqlSession -->
+<bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+	<constructor-arg name="sqlSessionFactory" ref="sqlSessionFactoryBean"></constructor-arg>
+	<constructor-arg name="executorType" value="BATCH"></constructor-arg>
+</bean>
+
+<!-- 事务控制 -->
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+	<!-- 控制住事务，其实就是控制住数据库的连接 -->
+	<constructor-arg name="dataSource" ref="pooledDataSource"></constructor-arg>
+</bean>
+<!-- 开启基于配置的事务 -->
+<aop:config>
+	<!-- 切入点表达式 -->
+	<aop:pointcut expression="execution(* com.xm.crud.service..*(..))" id="txPoint"/>
+	<!-- 事务增强 -->
+	<aop:advisor advice-ref="txAdvice" pointcut-ref="txPoint"/>
+</aop:config>
+<!-- 配置事务增强 -->
+<tx:advice id="txAdvice">
+	<tx:attributes>
+		<tx:method name="*"/>
+		<tx:method name="get*" read-only="true"/>
+	</tx:attributes>
+</tx:advice>
+
+</beans>
